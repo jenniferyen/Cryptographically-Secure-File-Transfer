@@ -21,12 +21,15 @@ class Client:
             server_dir = os.getcwd() + '/server'
             if not os.path.isdir(server_dir):
                 os.mkdir(server_dir)
-        # if network == None:
-        #     # 
+        if network == None:
+            network_dir = os.getcwd() + '/network'
+            if not os.path.isdir(network_dir):
+                os.mkdir(network_dir)
 
         self.nonce = 0
         self.session_key = ''
         self.server_public_key = ''
+        self.net_interface = network_interface(network_dir + '/', username)
 
 
     # ---------- LOGIN PROTOCOL ---------- #
@@ -57,22 +60,18 @@ class Client:
         self.nonce = self.nonce[:8] + (int.from_bytes(self.nonce[8:], 'big') + 1).to_bytes(8, 'big')
 
 
-    def encrypt_message(self, plaintext, data=b''):
-        # if string, encode as bytes
+    def AES_encrypt(self, plaintext, data=b''):
         if isinstance(plaintext, str):
             plaintext = plaintext.encode('utf-8')
 
-        # initalize cipher for AES
         cipher_aes = AES.new(self.session_key, AES.MODE_GCM, nonce=self.nonce)
-
-        # if there is data, encrypt it along with the original plaintext, ow just the plaintext
         if data != b'':
             ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext + ' '.encode('utf-8') + data)
         else:
             ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext)
 
         Client.increment_nonce(self)
-        return ciphertext, tag
+        return tag + ciphertext
 
 
     def initialize_login(self):
@@ -86,10 +85,16 @@ class Client:
         if new_user:
             login_type = 'new_user'
 
+        # E_S_k(login type | username | password)
         plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
-        encrypted_msg = Client.encrypt_message(self, plaintext)
+        aes_encrypted = Client.AES_encrypt(self, plaintext)
 
+        # E_k^+(S_k, nonce)
         cipher_rsa = PKCS1_OAEP.new(self.server_public_key)
+        rsa_encrypted = cipher_rsa.encrypt(self.session_key + self.nonce)
+
+        combined_msg = rsa_encrypted + aes_encrypted
+        self.net_interface.send_msg('server', combined_msg)
 
         print('Session is successfully established.')
         return 
