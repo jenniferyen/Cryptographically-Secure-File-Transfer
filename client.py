@@ -14,9 +14,13 @@ class Client:
 
     def __init__(self, client, server, network):
         if client == None:
-            print(os.getcwd())
-        # if server == None:
-        #     # 
+            client_dir = os.getcwd() + '/client'
+            if not os.path.isdir(client_dir):
+                os.mkdir(client_dir)
+        if server == None:
+            server_dir = os.getcwd() + '/server'
+            if not os.path.isdir(server_dir):
+                os.mkdir(server_dir)
         # if network == None:
         #     # 
 
