@@ -54,7 +54,7 @@ class Client:
 
 
     def increment_nonce(self):
-        nonce = nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
+        self.nonce = self.nonce[:8] + (int.from_bytes(self.nonce[8:], 'big') + 1).to_bytes(8, 'big')
 
 
     def encrypt_message(self, plaintext, data=b''):
@@ -63,8 +63,7 @@ class Client:
             plaintext = plaintext.encode('utf-8')
 
         # initalize cipher for AES
-        cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
-        ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext)
+        cipher_aes = AES.new(self.session_key, AES.MODE_GCM, nonce=self.nonce)
 
         # if there is data, encrypt it along with the original plaintext, ow just the plaintext
         if data != b'':
@@ -72,25 +71,25 @@ class Client:
         else:
             ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext)
 
-        increment_nonce(nonce)
+        Client.increment_nonce(self)
         return ciphertext, tag
 
 
     def initialize_login(self):
         print('Sending login message...')
 
-        self.nonce = initialize_nonce()
-        self.session_key = generate_session_key()
-        self.server_public_key = load_public_key()
+        self.nonce = Client.initialize_nonce(self)
+        self.session_key = Client.generate_session_key(self)
+        self.server_public_key = Client.load_public_key(self)
 
         login_type = 'login'
         if new_user:
             login_type = 'new_user'
 
         plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
-        encrypted_msg = encrypt_message(plaintext)
+        encrypted_msg = Client.encrypt_message(self, plaintext)
 
-        cipher_rsa = PKCS1_OAEP.new(server_public_key)
+        cipher_rsa = PKCS1_OAEP.new(self.server_public_key)
 
         print('Session is successfully established.')
         return 
@@ -101,6 +100,7 @@ class Client:
 def main(new_user, client, server, network):
     print('Beginning main routine...')
     curr_client = Client(client, server, network)
+    curr_client.initialize_login()
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], shortopts='hu:p:', longopts=['help', 'username=', 'password='])
