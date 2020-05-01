@@ -8,6 +8,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
 
 
+# create directories if not present
 client_dir = os.getcwd() + '/client'
 if not os.path.isdir(client_dir):
     os.mkdir(client_dir)
@@ -23,7 +24,6 @@ if not os.path.isdir(network_dir):
 
 username = ''
 password = ''
-
 nonce = 0
 session_key = ''
 server_public_key = ''
@@ -101,28 +101,28 @@ def initialize_login(net_interface):
 
 # ---------- MAIN ---------- #
 
-def main(new_user):
-    print('Beginning main routine...')
-
-    net_interface = network_interface(network_dir + '/', username)
-    initialize_login(net_interface)
-
 try:
     opts, args = getopt.getopt(sys.argv[1:], shortopts='hu:p:', longopts=['help', 'username=', 'password='])
 except:
     print('Usage: ')
-    print('client.py -u <username> -p <password>')
+    print('python3 client.py -u <username> -p <password>')
 
 new_user = False
 
 for opt, arg in opts:
     if opt == '-h' or opt == '--help':
         print('Usage: ')
-        print('client.py -u <username> -p <password>')
+        print('python3 client.py -u <username> -p <password>')
         sys.exit(1)
     elif opt in ('-u', '--username'):
         username = arg
     elif opt in ('-p', '--password'):
         password = arg
+
+def main(new_user):
+    print('Beginning client side routine...')
+
+    net_interface = network_interface(network_dir + '/', username)
+    initialize_login(net_interface)
 
 main(new_user)
