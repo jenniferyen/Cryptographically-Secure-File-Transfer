@@ -36,7 +36,7 @@ SERVER_ADDR = 'S'
 
 
 def generate_session_key():
-    session_key = Random.get_random_bytes(32)
+    session_key = Random.get_random_bytes(16)
     return session_key
 
 
@@ -64,15 +64,24 @@ def increment_nonce():
 def AES_encrypt(plaintext, data=b''):
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
-
+    
     cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
     if data != b'':
-        ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext + ' '.encode('utf-8') + data)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + ' '.encode('utf-8') + data)
     else:
-        ciphertext, tag = cipher_aes.encrypt_and_digest(plaintext)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
 
-    increment_nonce()
-    return tag + ciphertext
+    # print('client side session_key: ')
+    # print(session_key)
+    # print('client side nonce: ')
+    # print(nonce)
+    # print('client side auth_tag: ')
+    # print(auth_tag)
+    # print('client side ciphertext: ')
+    # print(ciphertext)
+
+    # increment_nonce()
+    return auth_tag + ciphertext
 
 
 def process_server_response(server_response):
@@ -80,7 +89,7 @@ def process_server_response(server_response):
     return
 
 
-def initialize_login(net_interface):
+def initialize_login(net_interface, new_user):
     print('Sending login message...')
 
     global nonce, session_key, server_public_key
@@ -94,12 +103,13 @@ def initialize_login(net_interface):
 
     # E_S_k(login type | username | password)
     plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
-    aes_encrypted = AES_encrypt(plaintext)
-    
+    aes_encrypted = AES_encrypt(plaintext) # auth_tag + ciphertext
+
     # E_k^+(S_k, nonce)
     cipher_rsa = PKCS1_OAEP.new(server_public_key)
     rsa_encrypted = cipher_rsa.encrypt(session_key + nonce)
 
+    # RSA(session key + nonce) + AES(login:username:password)
     combined_msg = rsa_encrypted + aes_encrypted
     net_interface.send_msg(SERVER_ADDR, combined_msg)
 
@@ -108,10 +118,10 @@ def initialize_login(net_interface):
     print('Session is successfully established.')
 
 
-# ---------- MAIN ---------- #
+# ---------- MAIN ROUTINE ---------- #
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], shortopts='hu:p:', longopts=['help', 'username=', 'password='])
+    opts, args = getopt.getopt(sys.argv[1:], shortopts='hnu:p:', longopts=['help', 'new_user', 'username=', 'password='])
 except:
     print('Usage: ')
     print('python3 client.py -u <username> -p <password>')
@@ -122,7 +132,10 @@ for opt, arg in opts:
     if opt == '-h' or opt == '--help':
         print('Usage: ')
         print('python3 client.py -u <username> -p <password>')
+        print('Add flag -n if you are a new user')
         sys.exit(1)
+    elif opt in ('-n', '--new_user'):
+        new_user = True
     elif opt in ('-u', '--username'):
         username = arg
     elif opt in ('-p', '--password'):
@@ -132,6 +145,6 @@ def main(new_user):
     print('Beginning client side routine...')
 
     net_interface = network_interface(NET_PATH, OWN_ADDR)
-    initialize_login(net_interface)
+    initialize_login(net_interface, new_user)
 
 main(new_user)
