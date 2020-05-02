@@ -3,7 +3,7 @@ import sys
 import getopt
 import time
 import getpass
-from netinterface import network_interface
+from netsim.netinterface import network_interface
 from Crypto import Random
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -17,9 +17,11 @@ network_dir = os.getcwd() + '/network'
 if not os.path.isdir(network_dir):
     os.mkdir(network_dir)
 
-
 server_public_key = ''
 server_private_key = ''
+
+NET_PATH = './network/'
+OWN_ADDR = 'S'
 
 
 def load_public_key():
@@ -50,7 +52,7 @@ def initialize_session(net_interface):
     server_public_key = load_public_key()
     server_private_key = load_private_key()
 
-    status, msg = net_interface.receive_msg()
+    status, msg = net_interface.receive_msg(blocking=True)
 
 
 # ---------- MAIN ---------- #
@@ -74,7 +76,7 @@ for opt, arg in opts:
 def main():
     print("Beginning server side routine...")
 
-    net_interface = network_interface(network_dir + '/', 'server')
+    net_interface = network_interface(NET_PATH, OWN_ADDR)
     initialize_session(net_interface)
 
 main()

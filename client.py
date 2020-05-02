@@ -2,7 +2,7 @@ import os
 import sys
 import getopt
 import time
-from netinterface import network_interface
+from netsim.netinterface import network_interface
 from Crypto import Random
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
@@ -21,12 +21,15 @@ network_dir = os.getcwd() + '/network'
 if not os.path.isdir(network_dir):
     os.mkdir(network_dir)
 
-
 username = ''
 password = ''
 nonce = 0
 session_key = ''
 server_public_key = ''
+
+NET_PATH = './network/'
+OWN_ADDR = 'C'
+SERVER_ADDR = 'S'
 
 
 # ---------- LOGIN PROTOCOL ---------- #
@@ -72,6 +75,11 @@ def AES_encrypt(plaintext, data=b''):
     return tag + ciphertext
 
 
+def process_server_response(server_response):
+    # print(server_response)
+    return
+
+
 def initialize_login(net_interface):
     print('Sending login message...')
 
@@ -93,7 +101,9 @@ def initialize_login(net_interface):
     rsa_encrypted = cipher_rsa.encrypt(session_key + nonce)
 
     combined_msg = rsa_encrypted + aes_encrypted
-    net_interface.send_msg('server', combined_msg)
+    net_interface.send_msg(SERVER_ADDR, combined_msg)
+
+    response = process_server_response(net_interface.receive_msg())
 
     print('Session is successfully established.')
 
@@ -121,7 +131,7 @@ for opt, arg in opts:
 def main(new_user):
     print('Beginning client side routine...')
 
-    net_interface = network_interface(network_dir + '/', username)
+    net_interface = network_interface(NET_PATH, OWN_ADDR)
     initialize_login(net_interface)
 
 main(new_user)
