@@ -43,7 +43,7 @@ def load_public_key():
     try:
         return RSA.import_key(pubkeystr)
     except:
-        print('Error: cannot import public key from file ')
+        print('Error: cannot import public key from file')
         sys.exit(1)
 
 
@@ -96,7 +96,6 @@ def initialize_login(net_interface):
     net_interface.send_msg('server', combined_msg)
 
     print('Session is successfully established.')
-    return 
 
 
 # ---------- MAIN ---------- #
