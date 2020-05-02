@@ -35,7 +35,7 @@ Creating a new network interface is done with the constructor of the network_int
 - the address of the new interface being created (e.g., 'A', 'B', ... or 'Z').
 
 
-The newtork module
+The network module
 ------------------
 
 The network is simulated by running the network.py program. This will copy files representing messages from the outgoing folder of the source to the incoming folders of the destinations. The network.py program should be started before any other program relying on the network_interface abstraction described above.
