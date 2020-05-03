@@ -23,7 +23,6 @@ if not os.path.isdir(network_dir):
 
 username = ''
 password = ''
-nonce = 0
 session_key = ''
 server_public_key = ''
 
@@ -56,45 +55,42 @@ def initialize_nonce():
     return randomBytes + counter.to_bytes(8, 'big')
 
 
-def increment_nonce():
-    global nonce
-    nonce = nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
+def increment_nonce(nonce):
+    return nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
 
 
-def AES_encrypt(plaintext, data=b''):
-    global nonce
+def AES_encrypt(plaintext, nonce, data=b''):
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
     if isinstance(data, str):
         data = data.encode('utf-8')
-    
-    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
+
+    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce)
     if data != b'':
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' ' + data)
     else:
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
 
-    # print('client side session_key: ')
-    # print(session_key)
-    # print('client side nonce: ')
-    # print(nonce)
-    # print('client side auth_tag: ')
-    # print(auth_tag)
-    # print('client side ciphertext: ')
-    # print(ciphertext)
-
-    # increment_nonce()
     return auth_tag + ciphertext
 
 
-def process_server_response(server_response):
-    return
+def AES_decrypt(msg, nonce):
+    auth_tag = msg[:16] 
+    ciphertext = msg[16:]
+    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce)
+
+    try:
+        plaintext = cipher_aes.decrypt_and_verify(ciphertext, auth_tag)
+        return plaintext
+    except:
+        print('AES-GCM authentication failed. Ending session now...')
+        exit(1)
 
 
 def initialize_login(net_interface, new_user):
     print('Sending login message...')
 
-    global nonce, session_key, server_public_key
+    global session_key, server_public_key
     nonce = initialize_nonce()
     session_key = generate_session_key()
     server_public_key = load_public_key()
@@ -103,22 +99,22 @@ def initialize_login(net_interface, new_user):
     if new_user:
         login_type = 'new_user:'
 
-    # E_S_k(login type | username | password)
-    plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
-    aes_encrypted = AES_encrypt(plaintext) # auth_tag + ciphertext
-    # increment_nonce()
-
     # E_k^+(S_k, nonce)
     cipher_rsa = PKCS1_OAEP.new(server_public_key)
     rsa_encrypted = cipher_rsa.encrypt(session_key + nonce)
+
+    # E_S_k(login type | username | password)
+    plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
+    aes_encrypted = AES_encrypt(plaintext, nonce) # auth_tag + ciphertext
+    nonce = increment_nonce(nonce)
 
     # RSA(session key + nonce) + AES(login:username:password)
     combined_msg = rsa_encrypted + aes_encrypted
     net_interface.send_msg(SERVER_ADDR, combined_msg)
 
-    server_response = net_interface.receive_msg(blocking=True)
-    print('client side server response: ')
-    print(server_response)
+    status, server_response = net_interface.receive_msg(blocking=True)
+    login_result = AES_decrypt(server_response, nonce)
+    print(login_result)
 
     print('Session is successfully established.')
 

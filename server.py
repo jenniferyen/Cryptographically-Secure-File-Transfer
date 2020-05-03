@@ -22,7 +22,6 @@ if not os.path.isdir(network_dir):
 server_public_key = ''
 server_private_key = ''
 session_key = ''
-nonce = 0
 
 NET_PATH = './network/'
 OWN_ADDR = 'S'
@@ -54,54 +53,32 @@ def load_private_key():
         sys.exit(1)
 
 
-def increment_nonce():
-    global nonce
-    nonce = nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
+def increment_nonce(nonce):
+    return nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
 
 
-def AES_encrypt(plaintext, data=b''):
-    global nonce
+def AES_encrypt(plaintext, nonce, data=b''):
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
     if isinstance(data, str):
         data = data.encode('utf-8')
     
-    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
+    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce)
     if data != b'':
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' ' + data)
     else:
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
 
-    # print('client side session_key: ')
-    # print(session_key)
-    # print('client side nonce: ')
-    # print(nonce)
-    # print('client side auth_tag: ')
-    # print(auth_tag)
-    # print('client side ciphertext: ')
-    # print(ciphertext)
-
-    # increment_nonce()
     return auth_tag + ciphertext
 
 
-def AES_decrypt(msg):
-    global nonce
+def AES_decrypt(msg, nonce):
     auth_tag = msg[:16] 
     ciphertext = msg[16:]
-    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
+    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce)
 
     try:
-        # print('server side session_key: ')
-        # print(session_key)
-        # print('server side nonce: ') 
-        # print(nonce)
-        # print('server side auth_tag: ')
-        # print(auth_tag)
-        # print('server side ciphertext: ')
-        # print(ciphertext)
         plaintext = cipher_aes.decrypt_and_verify(ciphertext, auth_tag)
-        # increment_nonce()
         return plaintext
     except:
         print('AES-GCM authentication failed. Ending session now...')
@@ -140,14 +117,15 @@ def initialize_session(net_interface):
     size_of_key = server_public_key.size_in_bytes() # 256 bytes
 
     # get session_key and nonce
-    global session_key, nonce
+    global session_key
     enc_session_key_and_nonce = msg[:size_of_key]
     session_key_and_nonce = cipher_rsa.decrypt(enc_session_key_and_nonce)
     session_key = session_key_and_nonce[:16]
-    nonce = session_key_and_nonce[16:]
+    nonce = session_key_and_nonce[16:] 
 
     # process AES(login:username:password)
-    credentials_plaintext = AES_decrypt(msg[size_of_key:])
+    credentials_plaintext = AES_decrypt(msg[size_of_key:], nonce)
+    nonce = increment_nonce(nonce)
     login_type, username, password = credentials_plaintext.split(':'.encode('utf-8'), 3)
 
     # user authentication
@@ -160,9 +138,7 @@ def initialize_session(net_interface):
             print('User authentication failed. Ending session now...')
             exit(1)
 
-    server_response = AES_encrypt(username, 'Login successful!')
-    print('server side server response: ')
-    print(server_response)
+    server_response = AES_encrypt(username, nonce, 'Login successful!')
     net_interface.send_msg(CLIENT_ADDR, server_response) 
 
     print('Session is successfully established.')
