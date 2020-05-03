@@ -6,6 +6,7 @@ from netsim.netinterface import network_interface
 from Crypto import Random
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, PKCS1_OAEP
+from Crypto.Protocol.KDF import scrypt
 
 
 # create directories if not present
@@ -32,7 +33,6 @@ SERVER_ADDR = 'S'
 
 
 # ---------- LOGIN PROTOCOL ---------- #
-
 
 def generate_session_key():
     session_key = Random.get_random_bytes(16)
@@ -115,6 +115,8 @@ def initialize_login(net_interface, new_user):
     # process and validate server response
     status, server_response = net_interface.receive_msg(blocking=True)
     login_result = AES_decrypt(server_response, nonce)
+    nonce = increment_nonce(nonce)
+
     print(login_result)
 
     if (login_result.decode('utf-8').split(' - ')[0] != username):
@@ -122,6 +124,63 @@ def initialize_login(net_interface, new_user):
         exit(1)
 
     print('Session is successfully established.')
+    return status, nonce
+
+
+# ---------- COMMAND PROTOCOL ----------#
+
+def encrypt_file(file_name):
+    global password
+    try:
+        with open(client_dir + '/' + file_name, 'rb') as f:
+            file_data = f.read()
+
+        # encrypt with AES using password derived file_key
+        salt = Random.get_random_bytes(16)
+        file_key = scrypt(password, salt, 16, N=2**14, r=8, p=1)
+        cipher_aes = AES.new(file_key, AES.MODE_GCM)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(file_data)
+        
+        return auth_tag + ciphertext
+    except:
+        print('Error encrypting file. Please try again.')
+
+
+def send_command(command, nonce, net_interface):
+    
+    if command[:3] == 'MKD':
+        print('Making a directory in the server...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
+    
+    elif command[:3] == 'RMD':
+        print('Removing a directory in the server...')
+
+    elif command[:3] == 'GWD':
+        print('Getting working directory in the server...')
+
+    elif command[:3] == 'CWD':
+        print('Changing working directory in the server...')
+
+    elif command[:3] == 'LST':
+        print('Listing contents of directory...')
+
+    elif command[:3] == 'UPL':
+        print('Uploading file to server...')
+        command_encrypted = AES_encrypt(command, nonce)
+        file_encrypted = encrypt_file(command[4:])
+        net_interface.send_msg(SERVER_ADDR, command_encrypted + file_encrypted)
+        nonce = increment_nonce(nonce)
+
+    elif command[:3] == 'DNL':
+        print('Downloading file from server...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
+
+    elif command[:3] == 'RMF':
+        print('Removing file from server...')
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -151,6 +210,10 @@ def main(new_user):
     print('Beginning client side routine...')
 
     net_interface = network_interface(NET_PATH, OWN_ADDR)
-    initialize_login(net_interface, new_user)
+    LOGGED_IN, nonce = initialize_login(net_interface, new_user)
+
+    while LOGGED_IN:
+        command = input('Enter a command: ')
+        send_command(command, nonce, net_interface)
 
 main(new_user)

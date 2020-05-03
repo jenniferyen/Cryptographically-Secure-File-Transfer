@@ -22,6 +22,7 @@ if not os.path.isdir(network_dir):
 server_public_key = ''
 server_private_key = ''
 session_key = ''
+username = ''
 
 NET_PATH = './network/'
 OWN_ADDR = 'S'
@@ -29,7 +30,6 @@ CLIENT_ADDR = 'C'
 
 
 # ---------- LOGIN PROTOCOL ---------- #
-
 
 def load_public_key():
     with open('test_keys/server_public.pem', 'rb') as f:
@@ -117,7 +117,7 @@ def initialize_session(net_interface):
     size_of_key = server_public_key.size_in_bytes() # 256 bytes
 
     # get session_key and nonce
-    global session_key
+    global session_key, username
     enc_session_key_and_nonce = msg[:size_of_key]
     session_key_and_nonce = cipher_rsa.decrypt(enc_session_key_and_nonce)
     session_key = session_key_and_nonce[:16]
@@ -139,9 +139,36 @@ def initialize_session(net_interface):
             exit(1)
 
     server_response = AES_encrypt(username, nonce, 'Login successful!')
+    nonce = increment_nonce(nonce)
     net_interface.send_msg(CLIENT_ADDR, server_response) 
 
     print('Session is successfully established.')
+    return authenticated, nonce
+
+
+# ---------- COMMAND PROTOCOL ---------- #
+
+def make_directory(directory_name, net_interface):
+    curr_path = server_dir + '/' + username.decode('utf-8')
+    try:
+        # check path
+        os.mkdir(curr_path + '/' + directory_name)
+        # send response
+    except:
+        print('Error: MKD')
+        # send response
+
+
+def remove_directory(directory_name, net_interface):
+    curr_path = server_dir + '/' + username.decode('utf-8')
+    print(curr_path)
+    try:
+        # check path
+        os.rmdir(curr_path + '/' + directory_name)
+        # send response
+    except:
+        print('Error: RMD')
+        # send response
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -166,6 +193,22 @@ def main():
     print("Beginning server side routine...")
 
     net_interface = network_interface(NET_PATH, OWN_ADDR)
-    initialize_session(net_interface)
+    LOGGED_IN, nonce = initialize_session(net_interface)
+
+    while LOGGED_IN:
+        status, msg = net_interface.receive_msg(blocking=True)
+        if status:
+            client_command = AES_decrypt(msg, nonce).split(' '.encode('utf-8'))
+            command_code = client_command[0].decode('utf-8')
+            
+            if command_code == 'MKD':
+                print('Making a directory in the server...')
+                directory_name = client_command[1].decode('utf-8')
+                make_directory(directory_name, net_interface)
+
+            elif command_code == 'RMD':
+                print('Removing a directory in the server...')
+                # directory_name = client_command[1].decode('utf-8')
+                # remove_directory(directory_name, net_interface)
 
 main()
