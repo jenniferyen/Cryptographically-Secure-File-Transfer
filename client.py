@@ -116,7 +116,7 @@ def initialize_login(net_interface, new_user):
     combined_msg = rsa_encrypted + aes_encrypted
     net_interface.send_msg(SERVER_ADDR, combined_msg)
 
-    server_response = net_interface.receive_msg()
+    server_response = net_interface.receive_msg(blocking=True)
     print('client side server response: ')
     print(server_response)
 
