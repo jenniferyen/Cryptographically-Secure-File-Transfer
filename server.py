@@ -65,7 +65,7 @@ def AES_encrypt(plaintext, nonce, data=b''):
     
     cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce)
     if data != b'':
-        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' ' + data)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' - ' + data)
     else:
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
 

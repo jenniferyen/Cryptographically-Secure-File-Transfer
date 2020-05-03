@@ -112,9 +112,14 @@ def initialize_login(net_interface, new_user):
     combined_msg = rsa_encrypted + aes_encrypted
     net_interface.send_msg(SERVER_ADDR, combined_msg)
 
+    # process and validate server response
     status, server_response = net_interface.receive_msg(blocking=True)
     login_result = AES_decrypt(server_response, nonce)
     print(login_result)
+
+    if (login_result.decode('utf-8').split(' - ')[0] != username):
+        print('Faulty communication between client and server. Ending session now...')
+        exit(1)
 
     print('Session is successfully established.')
 
