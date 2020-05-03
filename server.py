@@ -26,6 +26,7 @@ nonce = 0
 
 NET_PATH = './network/'
 OWN_ADDR = 'S'
+CLIENT_ADDR = 'C'
 
 
 # ---------- LOGIN PROTOCOL ---------- #
@@ -58,7 +59,34 @@ def increment_nonce():
     nonce = nonce[:8] + (int.from_bytes(nonce[8:], 'big') + 1).to_bytes(8, 'big')
 
 
+def AES_encrypt(plaintext, data=b''):
+    global nonce
+    if isinstance(plaintext, str):
+        plaintext = plaintext.encode('utf-8')
+    if isinstance(data, str):
+        data = data.encode('utf-8')
+    
+    cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
+    if data != b'':
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' ' + data)
+    else:
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
+
+    # print('client side session_key: ')
+    # print(session_key)
+    # print('client side nonce: ')
+    # print(nonce)
+    # print('client side auth_tag: ')
+    # print(auth_tag)
+    # print('client side ciphertext: ')
+    # print(ciphertext)
+
+    # increment_nonce()
+    return auth_tag + ciphertext
+
+
 def AES_decrypt(msg):
+    global nonce
     auth_tag = msg[:16] 
     ciphertext = msg[16:]
     cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
@@ -90,8 +118,12 @@ def create_new_user(username, password_hash):
             f.write(password_hash)
 
 
-def send_response():
-    print('Sending response back to client...')
+def authenticate_user(username, password_hash):
+    if username in os.listdir(server_dir):
+        with open(server_dir + '/' + username + '/password.hash', 'rb') as f:
+            if f.read() == password_hash:
+                return True
+    return False
 
 
 def initialize_session(net_interface):
@@ -118,13 +150,22 @@ def initialize_session(net_interface):
     credentials_plaintext = AES_decrypt(msg[size_of_key:])
     login_type, username, password = credentials_plaintext.split(':'.encode('utf-8'), 3)
 
+    # user authentication
     password_hash = SHA256.new(data=password).digest()
     if login_type.decode('utf-8') == 'new_user':
         create_new_user(username.decode('utf-8'), password_hash)
     elif login_type.decode('utf-8') == 'login':
-        print('Verifying credentials...')
+        authenticated = authenticate_user(username.decode('utf-8'), password_hash)
+        if not authenticated:
+            print('User authentication failed. Ending session now...')
+            exit(1)
 
-    send_response()
+    server_response = AES_encrypt(username, 'Login successful!')
+    print('server side server response: ')
+    print(server_response)
+    net_interface.send_msg(CLIENT_ADDR, server_response) 
+
+    print('Session is successfully established.')
 
 
 # ---------- MAIN ROUTINE ---------- #

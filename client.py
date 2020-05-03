@@ -62,12 +62,15 @@ def increment_nonce():
 
 
 def AES_encrypt(plaintext, data=b''):
+    global nonce
     if isinstance(plaintext, str):
         plaintext = plaintext.encode('utf-8')
+    if isinstance(data, str):
+        data = data.encode('utf-8')
     
     cipher_aes = AES.new(session_key, AES.MODE_GCM, nonce=nonce)
     if data != b'':
-        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + ' '.encode('utf-8') + data)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext + b' ' + data)
     else:
         ciphertext, auth_tag = cipher_aes.encrypt_and_digest(plaintext)
 
@@ -85,7 +88,6 @@ def AES_encrypt(plaintext, data=b''):
 
 
 def process_server_response(server_response):
-    # print(server_response)
     return
 
 
@@ -104,6 +106,7 @@ def initialize_login(net_interface, new_user):
     # E_S_k(login type | username | password)
     plaintext = login_type.encode('utf-8') + username.encode('utf-8') + ':'.encode('utf-8') + password.encode('utf-8')
     aes_encrypted = AES_encrypt(plaintext) # auth_tag + ciphertext
+    # increment_nonce()
 
     # E_k^+(S_k, nonce)
     cipher_rsa = PKCS1_OAEP.new(server_public_key)
@@ -113,7 +116,9 @@ def initialize_login(net_interface, new_user):
     combined_msg = rsa_encrypted + aes_encrypted
     net_interface.send_msg(SERVER_ADDR, combined_msg)
 
-    response = process_server_response(net_interface.receive_msg())
+    server_response = net_interface.receive_msg()
+    print('client side server response: ')
+    print(server_response)
 
     print('Session is successfully established.')
 
