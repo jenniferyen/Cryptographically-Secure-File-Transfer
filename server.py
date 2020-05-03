@@ -161,7 +161,6 @@ def make_directory(directory_name, net_interface):
 
 def remove_directory(directory_name, net_interface):
     curr_path = server_dir + '/' + username.decode('utf-8')
-    print(curr_path)
     try:
         # check path
         os.rmdir(curr_path + '/' + directory_name)
@@ -208,7 +207,25 @@ def main():
 
             elif command_code == 'RMD':
                 print('Removing a directory in the server...')
-                # directory_name = client_command[1].decode('utf-8')
-                # remove_directory(directory_name, net_interface)
+                directory_name = client_command[1].decode('utf-8')
+                remove_directory(directory_name, net_interface)
+
+            elif command_code == 'GWD':
+                print('Getting working directory...')
+
+            elif command_code == 'CWD':
+                print('Changing working directory...')
+
+            elif command_code == 'LST':
+                print('Listing contents of directory...')
+
+            elif command_code == 'UPL':
+                print('Uploading file to server...')
+
+            elif command_code == 'DNL':
+                print('Downloading file from server...')
+
+            elif command_code == 'RMF':
+                print('Removing file from server...')
 
 main()

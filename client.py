@@ -156,12 +156,15 @@ def send_command(command, nonce, net_interface):
     
     elif command[:3] == 'RMD':
         print('Removing a directory in the server...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
 
     elif command[:3] == 'GWD':
-        print('Getting working directory in the server...')
+        print('Getting working directory...')
 
     elif command[:3] == 'CWD':
-        print('Changing working directory in the server...')
+        print('Changing working directory...')
 
     elif command[:3] == 'LST':
         print('Listing contents of directory...')
