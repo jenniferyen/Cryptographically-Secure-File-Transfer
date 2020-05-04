@@ -27,6 +27,7 @@ username = ''
 NET_PATH = './network/'
 OWN_ADDR = 'S'
 CLIENT_ADDR = 'C'
+WORKING_DIR = server_dir + '/'
 
 
 # ---------- LOGIN PROTOCOL ---------- #
@@ -125,8 +126,8 @@ def initialize_session(net_interface):
 
     # process AES(login:username:password)
     credentials_plaintext = AES_decrypt(msg[size_of_key:], nonce)
-    nonce = increment_nonce(nonce)
     login_type, username, password = credentials_plaintext.split(':'.encode('utf-8'), 3)
+    nonce = increment_nonce(nonce)
 
     # user authentication
     password_hash = SHA256.new(data=password).digest()
@@ -138,9 +139,14 @@ def initialize_session(net_interface):
             print('User authentication failed. Ending session now...')
             exit(1)
 
+    # send success response to client
     server_response = AES_encrypt(username, nonce, 'Login successful!')
-    nonce = increment_nonce(nonce)
     net_interface.send_msg(CLIENT_ADDR, server_response) 
+    nonce = increment_nonce(nonce)
+
+    # update working directory
+    global WORKING_DIR
+    WORKING_DIR = WORKING_DIR + username.decode('utf-8')
 
     print('Session is successfully established.')
     return authenticated, nonce
@@ -148,26 +154,64 @@ def initialize_session(net_interface):
 
 # ---------- COMMAND PROTOCOL ---------- #
 
-def make_directory(directory_name, net_interface):
+def make_directory(directory_name, net_interface, nonce):
     curr_path = server_dir + '/' + username.decode('utf-8')
     try:
         # check path
         os.mkdir(curr_path + '/' + directory_name)
-        # send response
+        mkd_response = AES_encrypt(directory_name + ' successfully created', nonce)
+        net_interface.send_msg(CLIENT_ADDR, mkd_response)
+        nonce = increment_nonce(nonce)
     except:
         print('Error: MKD')
-        # send response
+        mkd_response = AES_encrypt('Error creating directory', nonce)
+        net_interface.send_msg(CLIENT_ADDR, mkd_response)
+        nonce = increment_nonce(nonce)
+    return nonce
 
 
-def remove_directory(directory_name, net_interface):
+def remove_directory(directory_name, net_interface, nonce):
     curr_path = server_dir + '/' + username.decode('utf-8')
     try:
         # check path
         os.rmdir(curr_path + '/' + directory_name)
-        # send response
+        rmd_response = AES_encrypt(directory_name + ' successfully removed', nonce)
+        net_interface.send_msg(CLIENT_ADDR, rmd_response)
+        nonce = increment_nonce(nonce)
     except:
         print('Error: RMD')
-        # send response
+        rmd_response = AES_encrypt('Error removing directory', nonce)
+        net_interface.send_msg(CLIENT_ADDR, rmd_response)
+        nonce = increment_nonce(nonce)
+    return nonce
+
+
+def change_working_dir(path_to_dir, net_interface, nonce):
+    global WORKING_DIR
+    try:
+        # check path
+        dirs = path_to_dir.split('/')
+        for dir in dirs:
+            if dir == '..':
+                # figure out break condition
+                    # print('Error: CWD out of bounds')
+                    # break
+                # else:
+                WORKING_DIR = '/'.join(WORKING_DIR.split('/')[:-1])
+            elif os.path.exists(WORKING_DIR + '/' + dir):
+                WORKING_DIR = WORKING_DIR + '/' + dir
+
+        cwd_response = AES_encrypt('Changed to: ' + WORKING_DIR, nonce)
+        net_interface.send_msg(CLIENT_ADDR, cwd_response)
+        nonce = increment_nonce(nonce)
+
+        print(WORKING_DIR)
+    except:
+        print('Error: CWD')
+        cwd_response = AES_encrypt('Error changing working directory', nonce)
+        net_interface.send_msg(CLIENT_ADDR, cwd_response)
+        nonce = increment_nonce(nonce)
+    return nonce, WORKING_DIR
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -199,22 +243,31 @@ def main():
         if status:
             client_command = AES_decrypt(msg, nonce).split(' '.encode('utf-8'))
             command_code = client_command[0].decode('utf-8')
-            
+            nonce = increment_nonce(nonce)
+
+            global WORKING_DIR 
+
             if command_code == 'MKD':
                 print('Making a directory in the server...')
                 directory_name = client_command[1].decode('utf-8')
-                make_directory(directory_name, net_interface)
+                nonce = make_directory(directory_name, net_interface, nonce)
 
             elif command_code == 'RMD':
                 print('Removing a directory in the server...')
                 directory_name = client_command[1].decode('utf-8')
-                remove_directory(directory_name, net_interface)
+                nonce = remove_directory(directory_name, net_interface, nonce)
 
             elif command_code == 'GWD':
                 print('Getting working directory...')
+                gwd_response = AES_encrypt('Current working directory is: ' + WORKING_DIR, nonce)
+                net_interface.send_msg(CLIENT_ADDR, gwd_response) 
+                nonce = increment_nonce(nonce)
 
             elif command_code == 'CWD':
                 print('Changing working directory...')
+                path_to_dir = client_command[1].decode('utf-8')
+                nonce, NEW_WORKING_DIR = change_working_dir(path_to_dir, net_interface, nonce)
+                WORKING_DIR = NEW_WORKING_DIR
 
             elif command_code == 'LST':
                 print('Listing contents of directory...')

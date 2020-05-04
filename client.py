@@ -114,12 +114,12 @@ def initialize_login(net_interface, new_user):
 
     # process and validate server response
     status, server_response = net_interface.receive_msg(blocking=True)
-    login_result = AES_decrypt(server_response, nonce)
+    login_result = AES_decrypt(server_response, nonce).decode('utf-8')
     nonce = increment_nonce(nonce)
 
     print(login_result)
 
-    if (login_result.decode('utf-8').split(' - ')[0] != username):
+    if (login_result.split(' - ')[0] != username):
         print('Faulty communication between client and server. Ending session now...')
         exit(1)
 
@@ -149,41 +149,55 @@ def encrypt_file(file_name):
 def send_command(command, nonce, net_interface):
     
     if command[:3] == 'MKD':
-        print('Making a directory in the server...')
+        # print('Making a directory in the server...')
         command_encrypted = AES_encrypt(command, nonce)
         net_interface.send_msg(SERVER_ADDR, command_encrypted)
         nonce = increment_nonce(nonce)
     
     elif command[:3] == 'RMD':
-        print('Removing a directory in the server...')
+        # print('Removing a directory in the server...')
         command_encrypted = AES_encrypt(command, nonce)
         net_interface.send_msg(SERVER_ADDR, command_encrypted)
         nonce = increment_nonce(nonce)
 
     elif command[:3] == 'GWD':
-        print('Getting working directory...')
+        # print('Getting working directory...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
 
     elif command[:3] == 'CWD':
-        print('Changing working directory...')
+        # print('Changing working directory...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
 
     elif command[:3] == 'LST':
-        print('Listing contents of directory...')
+        # print('Listing contents of directory...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
 
     elif command[:3] == 'UPL':
-        print('Uploading file to server...')
+        # print('Uploading file to server...')
         command_encrypted = AES_encrypt(command, nonce)
         file_encrypted = encrypt_file(command[4:])
         net_interface.send_msg(SERVER_ADDR, command_encrypted + file_encrypted)
         nonce = increment_nonce(nonce)
 
     elif command[:3] == 'DNL':
-        print('Downloading file from server...')
+        # print('Downloading file from server...')
         command_encrypted = AES_encrypt(command, nonce)
         net_interface.send_msg(SERVER_ADDR, command_encrypted)
         nonce = increment_nonce(nonce)
 
     elif command[:3] == 'RMF':
-        print('Removing file from server...')
+        # print('Removing file from server...')
+        command_encrypted = AES_encrypt(command, nonce)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
+        nonce = increment_nonce(nonce)
+
+    return nonce
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -217,6 +231,12 @@ def main(new_user):
 
     while LOGGED_IN:
         command = input('Enter a command: ')
-        send_command(command, nonce, net_interface)
+        nonce = send_command(command, nonce, net_interface)
+        
+        # process and validate server response to command
+        status, command_response = net_interface.receive_msg(blocking=True)
+        command_result = AES_decrypt(command_response, nonce).decode('utf-8')
+        nonce = increment_nonce(nonce)
+        print(command_result)
 
 main(new_user)
