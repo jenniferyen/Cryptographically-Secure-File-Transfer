@@ -231,18 +231,34 @@ def remove_file(file_name, net_interface, nonce):
     return nonce
 
 
-# def upload_file(file_name, data, net_interface, nonce):
-#     try:
-#         # 
-#     except:
-#         # 
+def upload_file(file_name, file_data, net_interface, nonce):
+    try:
+        with open(WORKING_DIR + '/' + file_name, 'wb') as f:
+            f.write(file_data)
+        upl_response = AES_encrypt(file_name + ' successfully uploaded', nonce)
+        net_interface.send_msg(CLIENT_ADDR, upl_response)
+        nonce = increment_nonce(nonce)
+    except:
+        print('Error: UPL') 
+        upl_response = AES_encrypt('Error uploading file', nonce)
+        net_interface.send_msg(CLIENT_ADDR, upl_response)
+        nonce = increment_nonce(nonce)
+    return nonce
 
 
-# def download_file(file_name, net_interface, nonce):
-#     try:
-#         # 
-#     except:
-        
+def download_file(file_name, net_interface, nonce):
+    try:
+        with open(WORKING_DIR + '/' + file_name, 'rb') as f:
+            file_data = f.read()
+        dnl_response = AES_encrypt(file_name + ' successfully downloaded', nonce, file_data)
+        net_interface.send_msg(CLIENT_ADDR, dnl_response)
+        nonce = increment_nonce(nonce)
+    except:
+        print('Error: DNL')
+        dnl_response = AES_encrypt('Error downloading file', nonce)
+        net_interface.send_msg(CLIENT_ADDR, dnl_response)
+        nonce = increment_nonce(nonce)
+    return nonce
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -294,7 +310,6 @@ def main():
                 net_interface.send_msg(CLIENT_ADDR, gwd_response) 
                 nonce = increment_nonce(nonce)
 
-            # a little buggy
             elif command_code == 'CWD':
                 print('Changing working directory...')
                 path_to_dir = client_command[1].decode('utf-8')
@@ -310,13 +325,14 @@ def main():
 
             elif command_code == 'UPL':
                 print('Uploading file to server...')
-                print(client_command)
-                # file_name = client_command[1].decode('utf-8')
-                # nonce = upload_file(file_name, data, net_interface, nonce)
-                # nonce = increment_nonce(nonce)
+                file_name = client_command[1].decode('utf-8')
+                file_data = client_command[2]
+                nonce = upload_file(file_name, file_data, net_interface, nonce)
 
             elif command_code == 'DNL':
                 print('Downloading file from server...')
+                file_name = client_command[1].decode('utf-8')
+                nonce = download_file(file_name, net_interface, nonce)
 
             elif command_code == 'RMF':
                 print('Removing file from server...')

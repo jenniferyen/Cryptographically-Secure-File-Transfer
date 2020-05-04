@@ -137,13 +137,33 @@ def encrypt_file(file_name):
 
         # encrypt with AES using password derived file_key
         salt = Random.get_random_bytes(16)
+        file_nonce = Random.get_random_bytes(16)
         file_key = scrypt(password, salt, 16, N=2**14, r=8, p=1)
-        cipher_aes = AES.new(file_key, AES.MODE_GCM)
-        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(file_data)
         
-        return auth_tag + ciphertext
+        cipher_aes = AES.new(file_key, AES.MODE_GCM, file_nonce)
+        ciphertext, auth_tag = cipher_aes.encrypt_and_digest(file_data)
+
+        return salt + file_nonce + auth_tag + ciphertext
     except:
-        print('Error encrypting file. Please try again.')
+        print('Error encrypting file')
+
+
+def decrypt_file(file_name, dnl_encrypted):
+    global password
+    try:
+        salt = dnl_encrypted[:16]
+        file_nonce = dnl_encrypted[16:32]
+        auth_tag = dnl_encrypted[32:48]
+        ciphertext = dnl_encrypted[48:]
+        file_key = scrypt(password, salt, 16, N=2**14, r=8, p=1)
+
+        cipher_aes = AES.new(file_key, AES.MODE_GCM, file_nonce)
+        plaintext = cipher_aes.decrypt_and_verify(ciphertext, auth_tag)
+
+        with open(client_dir + '/' + file_name, 'wb') as f:
+            f.write(plaintext)
+    except:
+        print('Error decrypting file')
 
 
 def send_command(command, nonce, net_interface):
@@ -180,9 +200,9 @@ def send_command(command, nonce, net_interface):
 
     elif command[:3] == 'UPL':
         # print('Uploading file to server...')
-        command_encrypted = AES_encrypt(command, nonce)
         file_encrypted = encrypt_file(command[4:])
-        net_interface.send_msg(SERVER_ADDR, command_encrypted + file_encrypted)
+        command_encrypted = AES_encrypt(command, nonce, file_encrypted)
+        net_interface.send_msg(SERVER_ADDR, command_encrypted)
         nonce = increment_nonce(nonce)
 
     elif command[:3] == 'DNL':
@@ -235,8 +255,24 @@ def main(new_user):
         
         # process and validate server response to command
         status, command_response = net_interface.receive_msg(blocking=True)
-        command_result = AES_decrypt(command_response, nonce).decode('utf-8')
+        try:
+            command_result = AES_decrypt(command_response, nonce).decode('utf-8')
+            print(command_result)
+        except:
+            command_result = AES_decrypt(command_response, nonce).decode('latin-1')
+
+        if (command[:3] == 'DNL'):
+            file_name = command.split(' ')[1]
+            dnl_encrypted = command_result.split(' - ')[1].encode('latin-1')
+            decrypt_file(file_name, dnl_encrypted)
+            print(file_name + ' successfully downloaded')
+
         nonce = increment_nonce(nonce)
-        print(command_result)
 
 main(new_user)
+
+
+# ---------- EDGE CASES ---------- #
+# 
+# - Uploaded/downloaded file cannot be empty. 
+# 
