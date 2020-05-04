@@ -264,7 +264,7 @@ def download_file(file_name, net_interface, nonce):
     try:
         with open(WORKING_DIR + '/' + file_name, 'rb') as f:
             file_data = f.read()
-        dnl_response = AES_encrypt(file_name + ' successfully downloaded', nonce, file_data)
+        dnl_response = AES_encrypt(file_data, nonce)
         net_interface.send_msg(CLIENT_ADDR, dnl_response)
         nonce = increment_nonce(nonce)
     except:

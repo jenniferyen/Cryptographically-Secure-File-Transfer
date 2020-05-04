@@ -162,10 +162,9 @@ def decrypt_file(file_name, dnl_encrypted):
         auth_tag = dnl_encrypted[32:48]
         ciphertext = dnl_encrypted[48:]
         file_key = scrypt(password, salt, 16, N=2**14, r=8, p=1)
-        
+
         cipher_aes = AES.new(file_key, AES.MODE_GCM, file_nonce)
         plaintext = cipher_aes.decrypt_and_verify(ciphertext, auth_tag)
-        print(plaintext)
 
         with open(client_dir + '/' + file_name, 'wb') as f:
             f.write(plaintext)
@@ -274,16 +273,13 @@ def main(new_user):
         if valid_command:
             status, command_response = net_interface.receive_msg(blocking=True)
             
-            try:
-                command_result = AES_decrypt(command_response, nonce).decode('utf-8')
-                print(command_result)
-            except:
-                command_result = AES_decrypt(command_response, nonce).decode('latin-1')
+            command_result = AES_decrypt(command_response, nonce)
+            if (command[:3] != 'DNL'):
+                print(command_result.decode('utf-8'))
 
             if (command[:3] == 'DNL' and command_result != 'Error: please check arguments and try again'):
                 file_name = command.split(' ')[1]
-                dnl_encrypted = command_result.split(' - ')[1].encode('latin-1')
-                if decrypt_file(file_name, dnl_encrypted):
+                if decrypt_file(file_name, command_result):
                     print(file_name + ' successfully downloaded')
 
             nonce = increment_nonce(nonce)
