@@ -214,6 +214,41 @@ def change_working_dir(path_to_dir, net_interface, nonce):
     return nonce, WORKING_DIR
 
 
+def remove_file(file_name, net_interface, nonce):
+    try:
+        # check path
+        if file_name == 'password.hash':
+            print('Cannot remove this file')
+            rmf_response = AES_encrypt('Cannot remove this file', nonce)
+            net_interface.send_msg(CLIENT_ADDR, rmf_response)
+            nonce = increment_nonce(nonce)
+        elif os.path.exists(WORKING_DIR + '/' + file_name):
+            os.remove(WORKING_DIR + '/' + file_name)
+            rmf_response = AES_encrypt(file_name + ' successfully removed', nonce)
+            net_interface.send_msg(CLIENT_ADDR, rmf_response)
+            nonce = increment_nonce(nonce)
+    except:
+        print('Error: RMF')
+        rmf_response = AES_encrypt('Error removing file', nonce)
+        net_interface.send_msg(CLIENT_ADDR, rmf_response)
+        nonce = increment_nonce(nonce)
+    return nonce
+
+
+def upload_file(file_name, data, net_interface, nonce):
+    try:
+        # 
+    except:
+        # 
+
+
+def download_file(file_name, net_interface, nonce):
+    try:
+        # 
+    except:
+        
+
+
 # ---------- MAIN ROUTINE ---------- #
 
 try:
@@ -263,6 +298,7 @@ def main():
                 net_interface.send_msg(CLIENT_ADDR, gwd_response) 
                 nonce = increment_nonce(nonce)
 
+            # a little buggy
             elif command_code == 'CWD':
                 print('Changing working directory...')
                 path_to_dir = client_command[1].decode('utf-8')
@@ -271,6 +307,10 @@ def main():
 
             elif command_code == 'LST':
                 print('Listing contents of directory...')
+                dir_items = ", ".join(os.listdir(WORKING_DIR))
+                lst_response = AES_encrypt(dir_items, nonce)
+                net_interface.send_msg(CLIENT_ADDR, lst_response)
+                nonce = increment_nonce(nonce)
 
             elif command_code == 'UPL':
                 print('Uploading file to server...')
@@ -280,5 +320,7 @@ def main():
 
             elif command_code == 'RMF':
                 print('Removing file from server...')
+                file_name = client_command[1].decode('utf-8')
+                nonce = remove_file(file_name, net_interface, nonce)
 
 main()
