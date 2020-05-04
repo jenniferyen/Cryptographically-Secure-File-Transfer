@@ -155,10 +155,9 @@ def initialize_session(net_interface):
 # ---------- COMMAND PROTOCOL ---------- #
 
 def make_directory(directory_name, net_interface, nonce):
-    curr_path = server_dir + '/' + username.decode('utf-8')
     try:
         # check path
-        os.mkdir(curr_path + '/' + directory_name)
+        os.mkdir(WORKING_DIR + '/' + directory_name)
         mkd_response = AES_encrypt(directory_name + ' successfully created', nonce)
         net_interface.send_msg(CLIENT_ADDR, mkd_response)
         nonce = increment_nonce(nonce)
@@ -171,10 +170,9 @@ def make_directory(directory_name, net_interface, nonce):
 
 
 def remove_directory(directory_name, net_interface, nonce):
-    curr_path = server_dir + '/' + username.decode('utf-8')
     try:
         # check path
-        os.rmdir(curr_path + '/' + directory_name)
+        os.rmdir(WORKING_DIR + '/' + directory_name)
         rmd_response = AES_encrypt(directory_name + ' successfully removed', nonce)
         net_interface.send_msg(CLIENT_ADDR, rmd_response)
         nonce = increment_nonce(nonce)
@@ -204,8 +202,6 @@ def change_working_dir(path_to_dir, net_interface, nonce):
         cwd_response = AES_encrypt('Changed to: ' + WORKING_DIR, nonce)
         net_interface.send_msg(CLIENT_ADDR, cwd_response)
         nonce = increment_nonce(nonce)
-
-        print(WORKING_DIR)
     except:
         print('Error: CWD')
         cwd_response = AES_encrypt('Error changing working directory', nonce)
@@ -235,17 +231,17 @@ def remove_file(file_name, net_interface, nonce):
     return nonce
 
 
-def upload_file(file_name, data, net_interface, nonce):
-    try:
-        # 
-    except:
-        # 
+# def upload_file(file_name, data, net_interface, nonce):
+#     try:
+#         # 
+#     except:
+#         # 
 
 
-def download_file(file_name, net_interface, nonce):
-    try:
-        # 
-    except:
+# def download_file(file_name, net_interface, nonce):
+#     try:
+#         # 
+#     except:
         
 
 
@@ -314,6 +310,10 @@ def main():
 
             elif command_code == 'UPL':
                 print('Uploading file to server...')
+                print(client_command)
+                # file_name = client_command[1].decode('utf-8')
+                # nonce = upload_file(file_name, data, net_interface, nonce)
+                # nonce = increment_nonce(nonce)
 
             elif command_code == 'DNL':
                 print('Downloading file from server...')
