@@ -90,10 +90,12 @@ def create_new_user(username, password_hash):
     user_folder = server_dir + '/' + username
     if os.path.exists(user_folder):
         print('This username is not available')
+        return False
     else:
         os.mkdir(user_folder)
         with open(user_folder + '/password.hash', 'wb') as f:
             f.write(password_hash)
+    return True
 
 
 def authenticate_user(username, password_hash):
@@ -132,31 +134,34 @@ def initialize_session(net_interface):
     # user authentication
     password_hash = SHA256.new(data=password).digest()
     if login_type.decode('utf-8') == 'new_user':
-        create_new_user(username.decode('utf-8'), password_hash)
+        username_available = create_new_user(username.decode('utf-8'), password_hash)
+        server_response = AES_encrypt('This username is unavailable', nonce)
+        net_interface.send_msg(CLIENT_ADDR, server_response)
+        nonce = increment_nonce(nonce)
+
     elif login_type.decode('utf-8') == 'login':
         authenticated = authenticate_user(username.decode('utf-8'), password_hash)
         if not authenticated:
             print('User authentication failed. Ending session now...')
             exit(1)
 
-    # send success response to client
-    server_response = AES_encrypt(username, nonce, 'Login successful!')
-    net_interface.send_msg(CLIENT_ADDR, server_response) 
-    nonce = increment_nonce(nonce)
+        # send success response to client
+        server_response = AES_encrypt(username, nonce, 'Login successful!')
+        net_interface.send_msg(CLIENT_ADDR, server_response) 
+        nonce = increment_nonce(nonce)
 
-    # update working directory
-    global WORKING_DIR
-    WORKING_DIR = WORKING_DIR + username.decode('utf-8')
+        # update working directory
+        global WORKING_DIR
+        WORKING_DIR = WORKING_DIR + username.decode('utf-8')
 
-    print('Session is successfully established.')
-    return authenticated, nonce
+        print('Session is successfully established.')
+    return nonce
 
 
 # ---------- COMMAND PROTOCOL ---------- #
 
 def make_directory(directory_name, net_interface, nonce):
     try:
-        # check path
         os.mkdir(WORKING_DIR + '/' + directory_name)
         mkd_response = AES_encrypt(directory_name + ' successfully created', nonce)
         net_interface.send_msg(CLIENT_ADDR, mkd_response)
@@ -171,7 +176,6 @@ def make_directory(directory_name, net_interface, nonce):
 
 def remove_directory(directory_name, net_interface, nonce):
     try:
-        # check path
         os.rmdir(WORKING_DIR + '/' + directory_name)
         rmd_response = AES_encrypt(directory_name + ' successfully removed', nonce)
         net_interface.send_msg(CLIENT_ADDR, rmd_response)
@@ -187,15 +191,21 @@ def remove_directory(directory_name, net_interface, nonce):
 def change_working_dir(path_to_dir, net_interface, nonce):
     global WORKING_DIR
     try:
-        # check path
         dirs = path_to_dir.split('/')
         for dir in dirs:
+            
+            # up a level
             if dir == '..':
-                # figure out break condition
-                    # print('Error: CWD out of bounds')
-                    # break
-                # else:
-                WORKING_DIR = '/'.join(WORKING_DIR.split('/')[:-1])
+                if WORKING_DIR.split('/')[-2] == 'server':
+                    print('Error: CWD out of bounds')
+                    cwd_response = AES_encrypt('Error: CWD out of bounds', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, cwd_response)
+                    nonce = increment_nonce(nonce)
+                    return nonce, WORKING_DIR
+                else:
+                    WORKING_DIR = '/'.join(WORKING_DIR.split('/')[:-1])
+            
+            # into a level
             elif os.path.exists(WORKING_DIR + '/' + dir):
                 WORKING_DIR = WORKING_DIR + '/' + dir
 
@@ -212,7 +222,6 @@ def change_working_dir(path_to_dir, net_interface, nonce):
 
 def remove_file(file_name, net_interface, nonce):
     try:
-        # check path
         if file_name == 'password.hash':
             print('Cannot remove this file')
             rmf_response = AES_encrypt('Cannot remove this file', nonce)
@@ -283,9 +292,9 @@ def main():
     print("Beginning server side routine...")
 
     net_interface = network_interface(NET_PATH, OWN_ADDR)
-    LOGGED_IN, nonce = initialize_session(net_interface)
+    nonce = initialize_session(net_interface)
 
-    while LOGGED_IN:
+    while True:
         status, msg = net_interface.receive_msg(blocking=True)
         if status:
             client_command = AES_decrypt(msg, nonce).split(' '.encode('utf-8'))
@@ -296,13 +305,23 @@ def main():
 
             if command_code == 'MKD':
                 print('Making a directory in the server...')
-                directory_name = client_command[1].decode('utf-8')
-                nonce = make_directory(directory_name, net_interface, nonce)
+                try:
+                    directory_name = client_command[1].decode('utf-8')
+                    nonce = make_directory(directory_name, net_interface, nonce)
+                except:
+                    error = AES_encrypt('Error: please check arguments and try again', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, error)
+                    nonce = increment_nonce(nonce)
 
             elif command_code == 'RMD':
                 print('Removing a directory in the server...')
-                directory_name = client_command[1].decode('utf-8')
-                nonce = remove_directory(directory_name, net_interface, nonce)
+                try:
+                    directory_name = client_command[1].decode('utf-8')
+                    nonce = remove_directory(directory_name, net_interface, nonce)
+                except:
+                    error = AES_encrypt('Error: please check arguments and try again', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, error)
+                    nonce = increment_nonce(nonce)
 
             elif command_code == 'GWD':
                 print('Getting working directory...')
@@ -312,9 +331,14 @@ def main():
 
             elif command_code == 'CWD':
                 print('Changing working directory...')
-                path_to_dir = client_command[1].decode('utf-8')
-                nonce, NEW_WORKING_DIR = change_working_dir(path_to_dir, net_interface, nonce)
-                WORKING_DIR = NEW_WORKING_DIR
+                try:
+                    path_to_dir = client_command[1].decode('utf-8')
+                    nonce, NEW_WORKING_DIR = change_working_dir(path_to_dir, net_interface, nonce)
+                    WORKING_DIR = NEW_WORKING_DIR
+                except:
+                    error = AES_encrypt('Error: please check arguments and try again', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, error)
+                    nonce = increment_nonce(nonce)    
 
             elif command_code == 'LST':
                 print('Listing contents of directory...')
@@ -331,12 +355,22 @@ def main():
 
             elif command_code == 'DNL':
                 print('Downloading file from server...')
-                file_name = client_command[1].decode('utf-8')
-                nonce = download_file(file_name, net_interface, nonce)
+                try:
+                    file_name = client_command[1].decode('utf-8')
+                    nonce = download_file(file_name, net_interface, nonce)
+                except:
+                    error = AES_encrypt('Error: please check arguments and try again', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, error)
+                    nonce = increment_nonce(nonce)
 
             elif command_code == 'RMF':
                 print('Removing file from server...')
-                file_name = client_command[1].decode('utf-8')
-                nonce = remove_file(file_name, net_interface, nonce)
+                try:
+                    file_name = client_command[1].decode('utf-8')
+                    nonce = remove_file(file_name, net_interface, nonce)
+                except:
+                    error = AES_encrypt('Error: please check arguments and try again', nonce)
+                    net_interface.send_msg(CLIENT_ADDR, error)
+                    nonce = increment_nonce(nonce)
 
 main()

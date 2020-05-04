@@ -119,11 +119,14 @@ def initialize_login(net_interface, new_user):
 
     print(login_result)
 
-    if (login_result.split(' - ')[0] != username):
+    if (login_result == 'This username is unavailable'):
+        print('Try a different username')
+        exit(1)
+
+    elif (login_result.split(' - ')[0] != username):
         print('Faulty communication between client and server. Ending session now...')
         exit(1)
 
-    print('Session is successfully established.')
     return status, nonce
 
 
@@ -200,10 +203,14 @@ def send_command(command, nonce, net_interface):
 
     elif command[:3] == 'UPL':
         # print('Uploading file to server...')
-        file_encrypted = encrypt_file(command[4:])
-        command_encrypted = AES_encrypt(command, nonce, file_encrypted)
-        net_interface.send_msg(SERVER_ADDR, command_encrypted)
-        nonce = increment_nonce(nonce)
+        try:
+            file_encrypted = encrypt_file(command[4:])
+            command_encrypted = AES_encrypt(command, nonce, file_encrypted)
+            net_interface.send_msg(SERVER_ADDR, command_encrypted)
+            nonce = increment_nonce(nonce)
+        except:
+            print('Error: please check arguments and try again')
+            return False, nonce
 
     elif command[:3] == 'DNL':
         # print('Downloading file from server...')
@@ -217,7 +224,11 @@ def send_command(command, nonce, net_interface):
         net_interface.send_msg(SERVER_ADDR, command_encrypted)
         nonce = increment_nonce(nonce)
 
-    return nonce
+    else:
+        print('Please enter a valid command')
+        return False, nonce
+
+    return True, nonce
 
 
 # ---------- MAIN ROUTINE ---------- #
@@ -251,28 +262,24 @@ def main(new_user):
 
     while LOGGED_IN:
         command = input('Enter a command: ')
-        nonce = send_command(command, nonce, net_interface)
+        valid_command, nonce = send_command(command, nonce, net_interface)
         
         # process and validate server response to command
-        status, command_response = net_interface.receive_msg(blocking=True)
-        try:
-            command_result = AES_decrypt(command_response, nonce).decode('utf-8')
-            print(command_result)
-        except:
-            command_result = AES_decrypt(command_response, nonce).decode('latin-1')
+        if valid_command:
+            status, command_response = net_interface.receive_msg(blocking=True)
+            
+            try:
+                command_result = AES_decrypt(command_response, nonce).decode('utf-8')
+                print(command_result)
+            except:
+                command_result = AES_decrypt(command_response, nonce).decode('latin-1')
 
-        if (command[:3] == 'DNL'):
-            file_name = command.split(' ')[1]
-            dnl_encrypted = command_result.split(' - ')[1].encode('latin-1')
-            decrypt_file(file_name, dnl_encrypted)
-            print(file_name + ' successfully downloaded')
+            if (command[:3] == 'DNL' and command_result != 'Error: please check arguments and try again'):
+                file_name = command.split(' ')[1]
+                dnl_encrypted = command_result.split(' - ')[1].encode('latin-1')
+                decrypt_file(file_name, dnl_encrypted)
+                print(file_name + ' successfully downloaded')
 
-        nonce = increment_nonce(nonce)
+            nonce = increment_nonce(nonce)
 
 main(new_user)
-
-
-# ---------- EDGE CASES ---------- #
-# 
-# - Uploaded/downloaded file cannot be empty. 
-# 
