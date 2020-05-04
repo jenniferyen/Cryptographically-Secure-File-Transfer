@@ -135,9 +135,14 @@ def initialize_session(net_interface):
     password_hash = SHA256.new(data=password).digest()
     if login_type.decode('utf-8') == 'new_user':
         username_available = create_new_user(username.decode('utf-8'), password_hash)
-        server_response = AES_encrypt('This username is unavailable', nonce)
-        net_interface.send_msg(CLIENT_ADDR, server_response)
-        nonce = increment_nonce(nonce)
+        if username_available:
+            server_response = AES_encrypt('New user has been created', nonce)
+            net_interface.send_msg(CLIENT_ADDR, server_response)
+            nonce = increment_nonce(nonce)
+        else:
+            server_response = AES_encrypt('This username is not available', nonce)
+            net_interface.send_msg(CLIENT_ADDR, server_response)
+            nonce = increment_nonce(nonce)
 
     elif login_type.decode('utf-8') == 'login':
         authenticated = authenticate_user(username.decode('utf-8'), password_hash)
@@ -150,11 +155,11 @@ def initialize_session(net_interface):
         net_interface.send_msg(CLIENT_ADDR, server_response) 
         nonce = increment_nonce(nonce)
 
-        # update working directory
-        global WORKING_DIR
-        WORKING_DIR = WORKING_DIR + username.decode('utf-8')
+    # update working directory
+    global WORKING_DIR
+    WORKING_DIR = WORKING_DIR + username.decode('utf-8')
 
-        print('Session is successfully established.')
+    print('Session is successfully established.')
     return nonce
 
 

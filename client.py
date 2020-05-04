@@ -119,7 +119,10 @@ def initialize_login(net_interface, new_user):
 
     print(login_result)
 
-    if (login_result == 'This username is unavailable'):
+    if login_result == 'New user has been created':
+        return status, nonce
+
+    elif login_result == 'This username is not available':
         print('Try a different username')
         exit(1)
 
