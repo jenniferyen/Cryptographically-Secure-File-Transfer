@@ -1,13 +1,19 @@
 # Cryptographically-Secure-File-Transfer
 
 ## Running the program
-This application simulates communication between a client and server over a network. Please run the following commands in order:
+This application simulates communication between a client and server over a network. It supports multiple users on one server. However, the way I implemented the netsim/ package only records logs from any one client/server session at a time. 
+
+Please run the following commands in order:
 1. python3 netsim/network.py -p './network/' -a 'CS' --clean
 	- Refer to docs.md for the netsim/ documentation.
+    - -p <path>
+    - -a <addresses (I used C and S for client and server)>
 2. python3 server.py
-	- The RSA password for the provided public/private key pair is 'password'.
+	- IMPORTANT: The RSA password for the provided public/private key pair is 'password'.
 3. python3 client.py -n -u <username> -p <password>
-	- Only add -n flag if you are a new user. Otherwise, leave it out.
+	- -n indicates that you are a new user. Otherwise, leave it out.
+    - -u <username>
+    - -p <password>
 
 ## Commands
 
@@ -18,3 +24,13 @@ This application simulates communication between a client and server over a netw
 ## Edge cases
 - Currently, the application does not handle cases where the client enters a path as an argument for a command. For example, you must change into a specific directory to remove files from that directory. 
 	- The only command that process a path is CWD. 
+
+## Encryption specifications
+- The session is initialized using hybrid encryption with RSA and AES-GCM (more on this in the login protocol session below).
+- Messages between the client and server are encrypted using AES in GCM mode. 
+- When uploading a file to the server, files are encrypted using AES in GCM mode and a file key generated with password based key derivation. This file key is never sent to the server. 
+- When downloading a file from the server, the file is decrypted with the filekey so that the client can read the plaintext.
+
+## Login protocol
+
+## Command protocol
