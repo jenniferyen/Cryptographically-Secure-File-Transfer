@@ -6,14 +6,14 @@ This application simulates communication between a client and server over a netw
 Please run the following commands in order:
 1. python3 netsim/network.py -p './network/' -a 'CS' --clean
 	- Refer to docs.md for the netsim/ documentation.
-    - -p <path>
-    - -a <addresses (I used C and S for client and server)>
+    - -p < path_to_network >
+    - -a < addresses (I used C and S for client and server) >
 2. python3 server.py
 	- IMPORTANT: The RSA password for the provided public/private key pair is 'password'.
 3. python3 client.py -n -u <username> -p <password>
 	- -n indicates that you are a new user. Otherwise, leave it out.
-    - -u <username>
-    - -p <password>
+    - -u < username >
+    - -p < password >
 
 ## Commands
 
